@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고등학교 기하 - 3D 공간좌표계 & 대칭점 시각화</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.85);
+            --panel-border: #334155;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-red: #f43f5e;
+            --accent-green: #22c55e;
+            --accent-purple: #a855f7;
+            --accent-yellow: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        #canvas-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
+        #ui-panel {
+            width: 380px;
+            height: 100%;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-left: 1px solid var(--panel-border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            z-index: 10;
+            box-shadow: -5px 0 25px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 2px solid var(--panel-border);
+            padding-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-sub);
+            margin-bottom: 6px;
+        }
+
+        .input-group {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .coord-inputs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .coord-field {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .coord-field label {
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .coord-field label.x-lbl { color: var(--accent-red); }
+        .coord-field label.y-lbl { color: var(--accent-green); }
+        .coord-field label.z-lbl { color: var(--accent-blue); }
+
+        .coord-field input[type="number"] {
+            width: 100%;
+            background: #1e293b;
+            border: 1px solid var(--panel-border);
+            color: #fff;
+            padding: 6px 8px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .coord-field input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-row label {
+            width: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent-blue);
+            cursor: pointer;
+        }
+
+        .symmetry-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        .btn {
+            background: #334155;
+            color: var(--text-main);
+            border: 1px solid transparent;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background: #475569;
+        }
+
+        .btn.active {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: var(--accent-purple);
+            color: #e9d5ff;
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+        }
+
+        .btn-reset {
+            grid-column: span 2;
+            background: #1e293b;
+            border: 1px dashed var(--panel-border);
+            color: var(--text-sub);
+        }
+
+        .btn-reset.active, .btn-reset:hover {
+            background: #334155;
+            color: #fff;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .preset-btn {
+            background: #1e293b;
+            border: 1px solid var(--panel-border);
+            color: var(--text-sub);
+            padding: 6px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            cursor: pointer;
+        }
+
+        .preset-btn:hover {
+            color: #fff;
+            border-color: var(--accent-blue);
+        }
+
+        .info-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-label {
+            color: var(--text-sub);
+        }
+
+        .info-value {
+            font-weight: 700;
+            font-family: monospace;
+        }
+
+        .info-value.p-orig { color: var(--accent-red); }
+        .info-value.p-sym { color: var(--accent-purple); }
+
+        .view-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .view-btn {
+            flex: 1;
+            background: #1e293b;
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .view-btn:hover {
+            background: #334155;
+        }
+
+        #canvas-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .legend-badge {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--panel-border);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #f8fafc;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot.x-axis { background: var(--accent-red); }
+        .dot.y-axis { background: var(--accent-green); }
+        .dot.z-axis { background: var(--accent-blue); }
+        .dot.pt-orig { background: var(--accent-red); }
+        .dot.pt-sym { background: var(--accent-purple); }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column-reverse; }
+            #ui-panel { width: 100%; height: 50vh; }
+            #canvas-container { height: 50vh; }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <div id="canvas-overlay">
+            <div class="legend-badge">
+                <span class="dot x-axis"></span> <b>X축</b> (오른쪽 - 빨강)
+                <span class="dot y-axis"></span> <b>Y축</b> (앞/뒤 - 초록)
+                <span class="dot z-axis"></span> <b>Z축</b> (위 - 파랑)
+            </div>
+            <div class="legend-badge">
+                <span class="dot pt-orig"></span> 원래 점 P
+                <span class="dot pt-sym"></span> 대칭 점 P'
+            </div>
+        </div>
+    </div>
+
+    <div id="ui-panel">
+        <h1>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+            공간좌표 & 대칭 시각화
+        </h1>
+
+        <div>
+            <div class="section-title">1. 좌표 입력 P(x, y, z)</div>
+            <div class="input-group">
+                <div class="coord-inputs">
+                    <div class="coord-field">
+                        <label class="x-lbl">X (좌/우)</label>
+                        <input type="number" id="input-x" value="4" step="1" min="-8" max="8">
+                    </div>
+                    <div class="coord-field">
+                        <label class="y-lbl">Y (앞/뒤)</label>
+                        <input type="number" id="input-y" value="3" step="1" min="-8" max="8">
+                    </div>
+                    <div class="coord-field">
+                        <label class="z-lbl">Z (높이)</label>
+                        <input type="number" id="input-z" value="2" step="1" min="-8" max="8">
+                    </div>
+                </div>
+
+                <div class="slider-row">
+                    <label class="x-lbl">X</label>
+                    <input type="range" id="slider-x" value="4" min="-8" max="8" step="0.5">
+                </div>
+                <div class="slider-row">
+                    <label class="y-lbl">Y</label>
+                    <input type="range" id="slider-y" value="3" min="-8" max="8" step="0.5">
+                </div>
+                <div class="slider-row">
+                    <label class="z-lbl">Z</label>
+                    <input type="range" id="slider-z" value="2" min="-8" max="8" step="0.5">
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">2. 대칭 이동 선택</div>
+            <div class="symmetry-grid">
+                <button class="btn btn-reset active" id="sym-off" onclick="setSymmetry('off')">대칭 없음 (원래 점만)</button>
+                <button class="btn" id="sym-xy" onclick="setSymmetry('xy')">xy 평면 대칭</button>
+                <button class="btn" id="sym-yz" onclick="setSymmetry('yz')">yz 평면 대칭</button>
+                <button class="btn" id="sym-zx" onclick="setSymmetry('zx')">zx 평면 대칭</button>
+                <button class="btn" id="sym-x" onclick="setSymmetry('x')">x 축 대칭</button>
+                <button class="btn" id="sym-y" onclick="setSymmetry('y')">y 축 대칭</button>
+                <button class="btn" id="sym-z" onclick="setSymmetry('z')">z 축 대칭</button>
+                <button class="btn" id="sym-origin" onclick="setSymmetry('origin')">원점 대칭</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">주요 예제 좌표</div>
+            <div class="preset-grid">
+                <button class="preset-btn" onclick="setPreset(4, 3, 2)">P(4, 3, 2)</button>
+                <button class="preset-btn" onclick="setPreset(-3, 4, 3)">P(-3, 4, 3)</button>
+                <button class="preset-btn" onclick="setPreset(3, -3, 4)">P(3, -3, 4)</button>
+                <button class="preset-btn" onclick="setPreset(5, 2, -3)">P(5, 2, -3)</button>
+                <button class="preset-btn" onclick="setPreset(-4, -3, -2)">P(-4, -3, -2)</button>
+                <button class="preset-btn" onclick="setPreset(2, 0, 4)">P(2, 0, 4)</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">좌표 및 거리 정보</div>
+            <div class="info-card">
+                <div class="info-row">
+                    <span class="info-label">원래 점 P:</span>
+                    <span class="info-value p-orig" id="val-orig">P(4, 3, 2)</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">원점과의 거리 OP:</span>
+                    <span class="info-value" id="val-dist-orig">5.39</span>
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--panel-border); margin: 4px 0;">
+                <div class="info-row">
+                    <span class="info-label">대칭점 P':</span>
+                    <span class="info-value p-sym" id="val-sym">선택 안 함</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">대칭 관계 공식:</span>
+                    <span class="info-value" id="val-rule" style="font-size: 0.78rem; color: var(--accent-purple);">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">시점 (카메라) 조절</div>
+            <div class="view-controls">
+                <button class="view-btn" onclick="resetCamera('iso')">교과서 기본 시점</button>
+                <button class="view-btn" onclick="resetCamera('top')">위에서 보기 (XY)</button>
+                <button class="view-btn" onclick="resetCamera('front')">정면 보기 (XZ)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // X축과 Y축 위치 교체 반영
+        // Math X = World Z (오른쪽 방향)
+        // Math Y = World X (앞쪽/관찰자 방향)
+        // Math Z = World Y (위쪽 방향)
+        function mathToWorld(mx, my, mz) {
+            return new THREE.Vector3(my, mz, mx);
+        }
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // 조명
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(15, 25, 20);
+        scene.add(dirLight);
+
+        // 그리드 (XY 평면)
+        const GRID_SIZE = 16;
+        const gridXY = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x475569, 0x1e293b);
+        gridXY.position.y = 0;
+        scene.add(gridXY);
+
+        // 좌표축 생성
+        const axisGroup = new THREE.Group();
+
+        function createAxis(color, direction, length = 10) {
+            const group = new THREE.Group();
+            const mat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+            const geom = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3().copy(direction).multiplyScalar(-length),
+                new THREE.Vector3().copy(direction).multiplyScalar(length)
+            ]);
+            const line = new THREE.Line(geom, mat);
+            group.add(line);
+
+            const arrowGeo = new THREE.ConeGeometry(0.2, 0.6, 16);
+            const arrowMat = new THREE.MeshBasicMaterial({ color: color });
+            const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+            arrow.position.copy(direction).multiplyScalar(length);
+            
+            if (direction.x === 1) arrow.rotation.z = -Math.PI / 2;
+            else if (direction.z === 1) arrow.rotation.x = Math.PI / 2;
+            
+            group.add(arrow);
+            return group;
+        }
+
+        // 축 스왑 반영된 축 배치
+        axisGroup.add(createAxis(0xf43f5e, new THREE.Vector3(0, 0, 1))); // X축 (오른쪽 - 빨강)
+        axisGroup.add(createAxis(0x22c55e, new THREE.Vector3(1, 0, 0))); // Y축 (앞쪽 - 초록)
+        axisGroup.add(createAxis(0x38bdf8, new THREE.Vector3(0, 1, 0))); // Z축 (위쪽 - 파랑)
+        scene.add(axisGroup);
+
+        // 가독성 강화된 말풍선 순서쌍 라벨 생성기
+        function createLabelSprite(text, textColor, bgColor = 'rgba(15, 23, 42, 0.85)') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = bgColor;
+            ctx.strokeStyle = textColor;
+            ctx.lineWidth = 4;
+            
+            const x = 10, y = 10, w = 300, h = 108, r = 20;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = textColor;
+            ctx.font = 'Bold 42px -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 160, 64);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(1.6, 0.64, 1);
+            return sprite;
+        }
+
+        // 축 이름 라벨
+        const lblX = createLabelSprite('X축', '#f43f5e', 'rgba(244, 63, 94, 0.15)');
+        lblX.position.copy(mathToWorld(10.8, 0, 0));
+        scene.add(lblX);
+
+        const lblY = createLabelSprite('Y축', '#22c55e', 'rgba(34, 197, 94, 0.15)');
+        lblY.position.copy(mathToWorld(0, 10.8, 0));
+        scene.add(lblY);
+
+        const lblZ = createLabelSprite('Z축', '#38bdf8', 'rgba(56, 189, 248, 0.15)');
+        lblZ.position.copy(mathToWorld(0, 0, 10.8));
+        scene.add(lblZ);
+
+        const lblO = createLabelSprite('O(0, 0, 0)', '#94a3b8', 'rgba(30, 41, 59, 0.8)');
+        lblO.position.copy(mathToWorld(-0.8, -0.8, -0.8));
+        scene.add(lblO);
+
+        let mainPointGroup = new THREE.Group();
+        let symPointGroup = new THREE.Group();
+        scene.add(mainPointGroup);
+        scene.add(symPointGroup);
+
+        let currentP = { x: 4, y: 3, z: 2 };
+        let currentSymMode = 'off';
+
+        function createPointMesh(color, size = 0.28) {
+            const geo = new THREE.SphereGeometry(size, 32, 32);
+            const mat = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.2,
+                metalness: 0.5,
+                emissive: color,
+                emissiveIntensity: 0.4
+            });
+            return new THREE.Mesh(geo, mat);
+        }
+
+        function createCuboidMesh(x, y, z, color) {
+            const wx = Math.abs(y) || 0.001;
+            const wy = Math.abs(z) || 0.001;
+            const wz = Math.abs(x) || 0.001;
+
+            const geo = new THREE.BoxGeometry(wx, wy, wz);
+            const mat = new THREE.MeshStandardMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.16,
+                roughness: 0.1,
+                side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(mathToWorld(x / 2, y / 2, z / 2));
+
+            const wireGeo = new THREE.EdgesGeometry(geo);
+            const wireMat = new THREE.LineDashedMaterial({
+                color: color,
+                dashSize: 0.2,
+                gapSize: 0.1,
+                linewidth: 1
+            });
+            const wireframe = new THREE.LineSegments(wireGeo, wireMat);
+            wireframe.computeLineDistances();
+            mesh.add(wireframe);
+
+            return mesh;
+        }
+
+        function createDashedLine(p1, p2, color = 0x64748b) {
+            const mat = new THREE.LineDashedMaterial({
+                color: color,
+                dashSize: 0.2,
+                gapSize: 0.1,
+                linewidth: 1
+            });
+            const geom = new THREE.BufferGeometry().setFromPoints([
+                mathToWorld(p1.x, p1.y, p1.z),
+                mathToWorld(p2.x, p2.y, p2.z)
+            ]);
+            const line = new THREE.Line(geom, mat);
+            line.computeLineDistances();
+            return line;
+        }
+
+        function updateScene() {
+            while(mainPointGroup.children.length > 0) { mainPointGroup.remove(mainPointGroup.children[0]); }
+            while(symPointGroup.children.length > 0) { symPointGroup.remove(symPointGroup.children[0]); }
+
+            const { x, y, z } = currentP;
+
+            // 1. 점 P 렌더링
+            const pointP = createPointMesh(0xf43f5e, 0.32);
+            pointP.position.copy(mathToWorld(x, y, z));
+            mainPointGroup.add(pointP);
+
+            // 순서쌍 라벨 P(x, y, z)
+            const labelP = createLabelSprite(`P(${x}, ${y}, ${z})`, '#f43f5e');
+            labelP.position.copy(mathToWorld(x + 0.5, y + 0.5, z + 0.5));
+            mainPointGroup.add(labelP);
+
+            // 직육면체
+            if (x !== 0 && y !== 0 && z !== 0) {
+                const cuboidP = createCuboidMesh(x, y, z, 0xf43f5e);
+                mainPointGroup.add(cuboidP);
+            }
+
+            // 투영 점선
+            mainPointGroup.add(createDashedLine({x:x, y:y, z:z}, {x:x, y:y, z:0}));
+            mainPointGroup.add(createDashedLine({x:x, y:y, z:0}, {x:x, y:0, z:0}));
+            mainPointGroup.add(createDashedLine({x:x, y:y, z:0}, {x:0, y:y, z:0}));
+            mainPointGroup.add(createDashedLine({x:x, y:y, z:z}, {x:0, y:y, z:z}));
+            mainPointGroup.add(createDashedLine({x:x, y:y, z:z}, {x:x, y:0, z:z}));
+
+            const footXY = createPointMesh(0x64748b, 0.12);
+            footXY.position.copy(mathToWorld(x, y, 0));
+            mainPointGroup.add(footXY);
+
+            // 2. 대칭점 P' 렌더링
+            if (currentSymMode !== 'off') {
+                let symP = { x: x, y: y, z: z };
+                let ruleText = '';
+
+                switch (currentSymMode) {
+                    case 'xy': symP.z = -z; ruleText = '(x, y, z) → (x, y, -z)'; break;
+                    case 'yz': symP.x = -x; ruleText = '(x, y, z) → (-x, y, z)'; break;
+                    case 'zx': symP.y = -y; ruleText = '(x, y, z) → (x, -y, z)'; break;
+                    case 'x': symP.y = -y; symP.z = -z; ruleText = '(x, y, z) → (x, -y, -z)'; break;
+                    case 'y': symP.x = -x; symP.z = -z; ruleText = '(x, y, z) → (-x, y, -z)'; break;
+                    case 'z': symP.x = -x; symP.y = -y; ruleText = '(x, y, z) → (-x, -y, z)'; break;
+                    case 'origin': symP.x = -x; symP.y = -y; symP.z = -z; ruleText = '(x, y, z) → (-x, -y, -z)'; break;
+                }
+
+                const pointSym = createPointMesh(0xa855f7, 0.32);
+                pointSym.position.copy(mathToWorld(symP.x, symP.y, symP.z));
+                symPointGroup.add(pointSym);
+
+                const labelSym = createLabelSprite(`P'(${symP.x}, ${symP.y}, ${symP.z})`, '#a855f7');
+                labelSym.position.copy(mathToWorld(symP.x + 0.5, symP.y + 0.5, symP.z + 0.5));
+                symPointGroup.add(labelSym);
+
+                const connectLineMat = new THREE.LineDashedMaterial({
+                    color: 0xf59e0b,
+                    dashSize: 0.25,
+                    gapSize: 0.15,
+                    linewidth: 2
+                });
+                const connectGeom = new THREE.BufferGeometry().setFromPoints([
+                    mathToWorld(x, y, z),
+                    mathToWorld(symP.x, symP.y, symP.z)
+                ]);
+                const connectLine = new THREE.Line(connectGeom, connectLineMat);
+                connectLine.computeLineDistances();
+                symPointGroup.add(connectLine);
+
+                if (symP.x !== 0 && symP.y !== 0 && symP.z !== 0) {
+                    const cuboidSym = createCuboidMesh(symP.x, symP.y, symP.z, 0xa855f7);
+                    symPointGroup.add(cuboidSym);
+                }
+
+                document.getElementById('val-sym').textContent = `P'(${symP.x}, ${symP.y}, ${symP.z})`;
+                document.getElementById('val-rule').textContent = ruleText;
+            } else {
+                document.getElementById('val-sym').textContent = '선택 안 함';
+                document.getElementById('val-rule').textContent = '-';
+            }
+
+            document.getElementById('val-orig').textContent = `P(${x}, ${y}, ${z})`;
+            const dist = Math.sqrt(x*x + y*y + z*z).toFixed(2);
+            document.getElementById('val-dist-orig').textContent = dist;
+        }
+
+        function resetCamera(mode = 'iso') {
+            controls.reset();
+            if (mode === 'iso') {
+                camera.position.set(20, 15, 18);
+            } else if (mode === 'top') {
+                camera.position.set(0, 25, 0.001);
+            } else if (mode === 'front') {
+                camera.position.set(25, 0, 0);
+            }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function onCoordinateChange(source, axis, value) {
+            const val = parseFloat(value) || 0;
+            currentP[axis] = val;
+
+            if (source === 'input') {
+                document.getElementById(`slider-${axis}`).value = val;
+            } else {
+                document.getElementById(`input-${axis}`).value = val;
+            }
+
+            updateScene();
+        }
+
+        function setSymmetry(mode) {
+            currentSymMode = mode;
+            const buttons = document.querySelectorAll('.symmetry-grid .btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            const targetBtn = document.getElementById(`sym-${mode}`);
+            if (targetBtn) targetBtn.classList.add('active');
+
+            updateScene();
+        }
+
+        function setPreset(x, y, z) {
+            currentP = { x, y, z };
+            ['x', 'y', 'z'].forEach(axis => {
+                document.getElementById(`input-${axis}`).value = currentP[axis];
+                document.getElementById(`slider-${axis}`).value = currentP[axis];
+            });
+            updateScene();
+        }
+
+        ['x', 'y', 'z'].forEach(axis => {
+            const inputEl = document.getElementById(`input-${axis}`);
+            const sliderEl = document.getElementById(`slider-${axis}`);
+
+            inputEl.addEventListener('input', (e) => onCoordinateChange('input', axis, e.target.value));
+            sliderEl.addEventListener('input', (e) => onCoordinateChange('slider', axis, e.target.value));
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        resetCamera('iso');
+        updateScene();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
